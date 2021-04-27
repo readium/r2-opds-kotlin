@@ -20,6 +20,10 @@ import org.readium.r2.shared.promise
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Manifest
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.util.Try
+import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpRequest
+import org.readium.r2.shared.util.http.fetchWithDecoder
 import java.net.URL
 
 enum class OPDS2ParserError {
@@ -36,6 +40,17 @@ class OPDS2Parser {
 
         private lateinit var feed: Feed
 
+        suspend fun parseUrlString(url: String): Try<ParseData, Exception> {
+            return DefaultHttpClient().fetchWithDecoder(HttpRequest(url)) {
+                this.parse(it.body, URL(url))
+            }
+        }
+
+        @Deprecated(
+            "Use `parseUrlString` with coroutines and pass a string for the URL instead",
+            ReplaceWith("OPDS2Parser.parseUrlString(url)"),
+            DeprecationLevel.WARNING
+        )
         fun parseURL(url: URL): Promise<ParseData, Exception> {
             return Fuel.get(url.toString(), null).promise() then {
                 val (_, _, result) = it
@@ -43,6 +58,25 @@ class OPDS2Parser {
             }
         }
 
+        suspend fun parseUrlString(
+            url: String,
+            headers: MutableMap<String, String>
+        ): Try<ParseData, Exception> {
+            return DefaultHttpClient().fetchWithDecoder(
+                HttpRequest(
+                    url = url,
+                    headers = headers
+                )
+            ) {
+                this.parse(it.body, URL(url))
+            }
+        }
+
+        @Deprecated(
+            "Use `parseUrlString` with coroutines and pass a string for the URL instead",
+            ReplaceWith("OPDS2Parser.parseUrlString(url, headers)"),
+            DeprecationLevel.WARNING
+        )
         @Suppress("unused")
         fun parseURL(headers:MutableMap<String,String>, url: URL): Promise<ParseData, Exception> {
             return Fuel.get(url.toString(), null).header(headers).promise() then {
