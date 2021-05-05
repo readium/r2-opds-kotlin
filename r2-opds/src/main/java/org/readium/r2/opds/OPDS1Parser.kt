@@ -9,7 +9,6 @@
 
 package org.readium.r2.opds
 
-import com.github.kittinunf.fuel.Fuel
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.then
 import org.joda.time.DateTime
@@ -18,12 +17,12 @@ import org.readium.r2.shared.extensions.toMap
 import org.readium.r2.shared.opds.*
 import org.readium.r2.shared.parser.xml.ElementNode
 import org.readium.r2.shared.parser.xml.XmlParser
-import org.readium.r2.shared.promise
 import org.readium.r2.shared.publication.*
 import org.readium.r2.shared.toJSON
 import org.readium.r2.shared.util.Href
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpClient
 import org.readium.r2.shared.util.http.HttpRequest
 import org.readium.r2.shared.util.http.fetchWithDecoder
 import java.net.URL
@@ -49,48 +48,38 @@ object Namespaces {
 class OPDS1Parser {
     companion object {
 
-        suspend fun parseUrlString(url: String): Try<ParseData, Exception> {
-            return DefaultHttpClient().fetchWithDecoder(HttpRequest(url)) {
+        suspend fun parseUrlString(url: String, client: HttpClient = DefaultHttpClient()): Try<ParseData, Exception> {
+            return client.fetchWithDecoder(HttpRequest(url)) {
                 this.parse(it.body, URL(url))
             }
         }
 
+        suspend fun parseRequest(request: HttpRequest, client: HttpClient = DefaultHttpClient()): Try<ParseData, Exception> {
+            return client.fetchWithDecoder(request) {
+                this.parse(it.body, URL(request.url))
+            }
+        }
+
         @Deprecated(
-            "Use `parseUrlString` with coroutines and pass a string for the URL instead",
+            "Use `parseRequest` or `parseUrlString` with coroutines instead",
             ReplaceWith("OPDS1Parser.parseUrlString(url)"),
             DeprecationLevel.WARNING
         )
         fun parseURL(url: URL): Promise<ParseData, Exception> {
-            return Fuel.get(url.toString(), null).promise() then {
-                val (_, _, result) = it
-                this.parse(xmlData = result, url = url)
-            }
-        }
-
-        suspend fun parseUrlString(
-            url: String,
-            headers: MutableMap<String, String>
-        ): Try<ParseData, Exception> {
-            return DefaultHttpClient().fetchWithDecoder(
-                HttpRequest(
-                    url = url,
-                    headers = headers
-                )
-            ) {
-                this.parse(it.body, URL(url))
+            return DefaultHttpClient().fetchPromise(HttpRequest(url.toString())) then {
+                this.parse(xmlData = it.body, url = url)
             }
         }
 
         @Deprecated(
-            "Use `parseUrlString` with coroutines and pass a string for the URL instead",
-            ReplaceWith("OPDS1Parser.parseUrlString(url, headers)"),
+            "Use `parseRequest` or `parseUrlString` with coroutines instead",
+            ReplaceWith("OPDS1Parser.parseUrlString(url)"),
             DeprecationLevel.WARNING
         )
         @Suppress("unused")
         fun parseURL(headers: MutableMap<String,String>, url: URL): Promise<ParseData, Exception> {
-            return Fuel.get(url.toString(), null).header(headers).promise() then {
-                val (_, _, result) = it
-                this.parse(xmlData = result, url = url)
+            return DefaultHttpClient().fetchPromise(HttpRequest(url = url.toString(), headers = headers)) then {
+                this.parse(xmlData = it.body, url = url)
             }
         }
 
@@ -293,10 +282,9 @@ class OPDS1Parser {
                 return@let it
             }
 
-            return Fuel.get(unwrappedURL.toString(), null).promise() then {
-                val (_, _, result) = it
+            return DefaultHttpClient().fetchPromise(HttpRequest(unwrappedURL.toString())) then {
 
-                val document = XmlParser().parse(result.inputStream())
+                val document = XmlParser().parse(it.body.inputStream())
 
                 val urls = document.get("Url", Namespaces.Search)
 
