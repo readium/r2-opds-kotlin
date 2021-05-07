@@ -13,6 +13,6 @@ import org.readium.r2.shared.util.http.HttpClient
 import org.readium.r2.shared.util.http.HttpFetchResponse
 import org.readium.r2.shared.util.http.HttpRequest
 
-fun HttpClient.fetchPromise(request: HttpRequest): Promise<HttpFetchResponse, Exception> {
+internal fun HttpClient.fetchPromise(request: HttpRequest): Promise<HttpFetchResponse, Exception> {
     return task { runBlocking { fetch(request).getOrThrow() } }
 }
